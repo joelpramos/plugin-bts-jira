@@ -42,6 +42,8 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.List;
 
+import static java.util.Optional.ofNullable;
+
 /**
  * Provide functionality for building jira's ticket description
  *
@@ -117,30 +119,40 @@ public class JIRATicketDescriptionService {
 				descriptionBuilder.append("h3.*Test execution log:*\n");
 				descriptionBuilder.append(
 						"{panel:title=Test execution log|borderStyle=solid|borderColor=#ccc|titleColor=#34302D|titleBGColor=#6DB33F}");
-				for (Log log : logs) {
+				logs.forEach(log -> {
 					if (ticketRQ.getIsIncludeLogs()) {
 						descriptionBuilder.append(CODE).append(getFormattedMessage(log)).append(CODE);
 					}
-					if (StringUtils.isNotBlank(log.getContentType()) && StringUtils.isNotBlank(log.getAttachment())
-							&& ticketRQ.getIsIncludeScreenshots()) {
-						try {
-							MimeType mimeType = mimeRepository.forName(log.getContentType());
-							if (log.getContentType().contains(IMAGE_CONTENT)) {
-								descriptionBuilder.append("!")
-										.append(log.getAttachment())
-										.append(mimeType.getExtension())
-										.append(IMAGE_HEIGHT_TEMPLATE);
-							} else {
-								descriptionBuilder.append("[^").append(log.getAttachment()).append(mimeType.getExtension()).append("]");
-							}
-							descriptionBuilder.append(JIRA_MARKUP_LINE_BREAK);
-						} catch (MimeTypeException e) {
-							descriptionBuilder.append(JIRA_MARKUP_LINE_BREAK);
-							LOGGER.error("JIRATicketDescriptionService error: " + e.getMessage(), e);
-						}
 
+					if (ticketRQ.getIsIncludeScreenshots()) {
+
+						ofNullable(log.getAttachment()).ifPresent(attachment -> {
+							if (StringUtils.isNotBlank(attachment.getContentType()) && StringUtils.isNotBlank(attachment.getFileId())
+									&& ticketRQ.getIsIncludeScreenshots()) {
+								try {
+									MimeType mimeType = mimeRepository.forName(attachment.getContentType());
+									if (attachment.getContentType().contains(IMAGE_CONTENT)) {
+										descriptionBuilder.append("!")
+												.append(log.getAttachment())
+												.append(mimeType.getExtension())
+												.append(IMAGE_HEIGHT_TEMPLATE);
+									} else {
+										descriptionBuilder.append("[^")
+												.append(log.getAttachment())
+												.append(mimeType.getExtension())
+												.append("]");
+									}
+									descriptionBuilder.append(JIRA_MARKUP_LINE_BREAK);
+								} catch (MimeTypeException e) {
+									descriptionBuilder.append(JIRA_MARKUP_LINE_BREAK);
+									LOGGER.error("JIRATicketDescriptionService error: " + e.getMessage(), e);
+								}
+
+							}
+						});
 					}
-				}
+
+				});
 				descriptionBuilder.append("{panel}\n");
 			}
 		}
